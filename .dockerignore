@@ -1,0 +1,23 @@
+# Dependências já instaladas na máquina — o build instala as suas.
+.venv/
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+
+# Banco SQLite, caches e artefatos gerados em execução local.
+server/demo-data.sqlite
+server/demo-data.sqlite-shm
+server/demo-data.sqlite-wal
+server/tmp*/
+**/__pycache__/
+**/*.pyc
+.runtime/
+.acl-repair/
+artifacts/
+*.log
+
+# Controle de versão e automação exclusiva do Windows.
+.git/
+.gitignore
+*.bat
+*.ps1

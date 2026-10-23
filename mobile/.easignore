@@ -1,0 +1,21 @@
+# Arquivos locais que não devem subir para o EAS Build.
+node_modules/
+.expo/
+android/
+ios/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+*.apk
+*.aab
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db

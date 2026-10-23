@@ -1,0 +1,104 @@
+{
+  "expo": {
+    "name": "Cooperativa",
+    "slug": "cooperativa-demo",
+    "version": "0.1.0",
+    "scheme": "cooperativa-demo",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "A Cooperativa usa sua localização para enviar ao motorista/cliente via P2P."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "A Cooperativa usa a câmera para ler o QR code do painel de demonstração.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "VIBRATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "br.com.cooperativa.plataforma.demo",
+      "config": {
+        "googleMaps": {
+          "apiKey": "COLOQUE_SUA_ANDROID_MAPS_KEY_AQUI"
+        }
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "br.com.cooperativa.plataforma.demo",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "A Cooperativa usa sua localização para enviar ao parceiro via P2P.",
+        "NSLocationAlwaysUsageDescription": "A Cooperativa usa sua localização para enviar ao parceiro via P2P."
+      },
+      "config": {
+        "googleMapsApiKey": "COLOQUE_SUA_IOS_MAPS_KEY_AQUI"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "extra": {
+      "DEV_MOCK_ENABLED": true,
+      "DEV_SERVER_URL": "http://192.168.15.6:4747",
+      "SIGNALING_SERVER_URL": "http://192.168.15.6:4747",
+      "POLYGON_RPC_URL": "https://rpc-amoy.polygon.technology",
+      "IDENTITY_CONTRACT_ADDRESS": "0x0000000000000000000000000000000000000000",
+      "TURN_URL": "",
+      "TURN_USERNAME": "",
+      "TURN_CREDENTIAL": "",
+      "GOOGLE_MAPS_KEY": "",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "a55c9e13-c372-4cf5-9227-0bb0b4cb0762"
+      }
+    },
+    "owner": "vitor_maia"
+  }
+}

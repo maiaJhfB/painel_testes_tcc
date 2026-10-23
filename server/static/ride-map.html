@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mapa da corrida</title>
+  <link rel="stylesheet" href="/mock/map/leaflet/leaflet.css">
+  <style>
+    html,body,#map{height:100%;width:100%;margin:0;background:#e8edf0;font-family:system-ui,sans-serif}
+    .leaflet-control-zoom{border:0!important;box-shadow:0 2px 12px #0f172a25!important}
+    .leaflet-control-attribution{font-size:10px!important;max-width:95%;line-height:1.5!important}
+    .ride-pin{display:flex;align-items:center;justify-content:center;border:3px solid white;border-radius:50%;box-shadow:0 3px 15px #0f172a45;font-size:19px}
+    .ride-car{background:#10b981}.ride-passenger{background:#6366f1}.ride-destination{background:#0f172a}
+    .leaflet-tooltip{border:0;border-radius:8px;padding:5px 9px;font-weight:600;box-shadow:0 2px 10px #0f172a20}
+    #fallback{position:absolute;z-index:800;top:80px;left:20px;right:20px;background:#fff4d6;color:#714d00;padding:12px;border-radius:12px;font-size:13px;display:none}
+  </style>
+</head>
+<body>
+  <div id="map" aria-label="Mapa interativo com as posições dos participantes"></div>
+  <div id="fallback" role="status">Não foi possível carregar o mapa. Verifique sua conexão com a internet.</div>
+  <script src="/mock/map/leaflet/leaflet.js"></script>
+  <script>
+  (() => {
+    const parentOrigin = document.referrer ? new URL(document.referrer).origin : null;
+    const notify = (type, extra = {}) => {
+      if (parentOrigin && window.parent !== window) window.parent.postMessage({type, ...extra}, parentOrigin);
+    };
+    if (!window.L) {
+      document.getElementById('fallback').style.display = 'block';
+      notify('ride-map-error');
+      return;
+    }
+    const map = L.map('map', {zoomControl:false, attributionControl:true}).setView([-23.555,-46.66],14);
+    map.attributionControl.setPrefix('<a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>');
+    L.control.zoom({position:'bottomright'}).addTo(map);
+    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom:19,
+      keepBuffer:1,
+      updateWhenIdle:true,
+      attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors · Rotas <a href="https://project-osrm.org/" target="_blank" rel="noopener">OSRM</a>'
+    }).addTo(map);
+    let tileFailures=0;
+    tiles.on('tileerror',()=>{if(++tileFailures===3)notify('ride-map-error')});
+    tiles.on('tileload',()=>{tileFailures=0;notify('ride-map-loaded')});
+    const icon = (kind, glyph, size=38) => L.divIcon({
+      className:'', html:`<div class="ride-pin ride-${kind}" style="width:${size-6}px;height:${size-6}px">${glyph}</div>`,
+      iconSize:[size,size], iconAnchor:[size/2,size/2]
+    });
+    const car = L.marker([-23.5489,-46.6388], {icon:icon('car','🚗'), zIndexOffset:300}).bindTooltip('Motorista',{direction:'top',offset:[0,-19]});
+    const passenger = L.marker([-23.5533,-46.6558], {icon:icon('passenger','👤'), zIndexOffset:200}).bindTooltip('Passageiro',{direction:'bottom',offset:[0,19]}).addTo(map);
+    const destination = L.marker([-23.567,-46.685], {icon:icon('destination','⚑',30)}).bindTooltip('Destino',{direction:'top',offset:[0,-15]}).addTo(map);
+    const fullRoute = L.polyline([], {color:'#ffffff',weight:10,opacity:.9}).addTo(map);
+    const passedRoute = L.polyline([], {color:'#64748b',weight:6,opacity:.45}).addTo(map);
+    const remainingRoute = L.polyline([], {color:'#6366f1',weight:6,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(map);
+    let phase=null,fitRevision=-1,points=[];
+    let following=true;
+    map.on('dragstart',()=>{following=false;notify('ride-map-dragged')});
+
+    function nearestIndex(point) {
+      let best=0,bestDistance=Infinity;
+      points.forEach((candidate,index)=>{
+        const distance=(candidate[0]-point.latitude)**2+(candidate[1]-point.longitude)**2;
+        if(distance<bestDistance){best=index;bestDistance=distance}
+      });
+      return best;
+    }
+
+    window.addEventListener('message',(event)=>{
+      if(event.source!==window.parent || event.origin!==parentOrigin || event.data?.type!=='ride-map-state')return;
+      const state=event.data;
+      const route=state.route;
+      if(!route?.coordinates?.length)return;
+      const phaseChanged=phase!==route.phase;
+      const needsFit=phaseChanged||fitRevision!==state.fitRevision;
+      phase=route.phase;
+      points=route.coordinates.map(([lon,lat])=>[lat,lon]);
+      const color=state.stage==='in_progress'?'#10b981':'#6366f1';
+      fullRoute.setLatLngs(points);
+      passedRoute.setLatLngs(points);
+      remainingRoute.setStyle({color});
+      const index=state.car?nearestIndex(state.car):0;
+      remainingRoute.setLatLngs(points.slice(index));
+      passenger.setLatLng([state.passenger.latitude,state.passenger.longitude]);
+      destination.setLatLng([state.destination.latitude,state.destination.longitude]);
+      if(state.car){
+        car.setLatLng([state.car.latitude,state.car.longitude]);
+        if(!map.hasLayer(car))car.addTo(map);
+      }
+      if(needsFit){
+        fitRevision=state.fitRevision;
+        following=true;
+        const visible=points.slice(index);
+        visible.push([state.passenger.latitude,state.passenger.longitude]);
+        if(state.car)visible.push([state.car.latitude,state.car.longitude]);
+        map.fitBounds(L.latLngBounds(visible),{paddingTopLeft:[42,95],paddingBottomRight:[42,65],maxZoom:16,animate:!phaseChanged});
+      }else if(following&&state.car&&!map.getBounds().pad(-.18).contains(car.getLatLng())){
+        map.panTo(car.getLatLng(),{animate:true,duration:.8});
+      }
+    });
+    const resize = new ResizeObserver(()=>map.invalidateSize());
+    resize.observe(document.getElementById('map'));
+    notify('ride-map-ready');
+    window.addEventListener('pagehide',()=>{resize.disconnect();map.remove()},{once:true});
+  })();
+  </script>
+</body>
+</html>

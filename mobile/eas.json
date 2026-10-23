@@ -1,0 +1,15 @@
+{
+  "cli": {
+    "version": ">= 25.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "node": "20.20.2",
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  }
+}

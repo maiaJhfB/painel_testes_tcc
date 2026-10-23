@@ -1,0 +1,3 @@
+# Mantém os scripts executados dentro do container com LF, mesmo no Windows.
+* text=auto
+*.sh text eol=lf

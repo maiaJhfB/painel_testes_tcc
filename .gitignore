@@ -1,0 +1,9 @@
+.runtime/
+.acl-repair/
+.venv/
+mobile/.expo/
+mobile/node_modules/
+server/__pycache__/
+server/*.sqlite-shm
+server/*.sqlite-wal
+server/demo-data.sqlite
