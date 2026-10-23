@@ -4,26 +4,26 @@
  * Exibe mapa em tempo real com localização do motorista via P2P (sem servidor).
  * Inclui chat P2P e controles de status.
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View, Text, TouchableOpacity, TextInput,
   FlatList, StyleSheet, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter } from "expo-router";
 import { useP2PStore } from "@/store/useP2PStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ChatMessage } from "@/services/P2PService";
 import RideFareCard from "@/components/RideFareCard";
-import { foregroundLocationService, type ForegroundLocationLease, type ForegroundLocationState } from "@/services/ForegroundLocationService";
+import { rideLocationService } from "@/services/rideLocationService";
+import { useGpsStore } from "@/store/useGpsStore";
 
 export default function ActiveRideScreen() {
   const [messageText, setMessageText] = useState("");
   const chatRef = useRef<FlatList>(null);
   const navigatedToMap = useRef(false);
   const router = useRouter();
-  const locationLease = useRef<ForegroundLocationLease | null>(null);
-  const [gps, setGps] = useState<ForegroundLocationState>({ status: "idle", message: "Localização aguarda conexão." });
+  const gps = useGpsStore();
 
   const { session } = useAuthStore();
   const {
@@ -33,19 +33,6 @@ export default function ActiveRideScreen() {
   } = useP2PStore();
 
   const isDriver = session?.profile.role === "driver";
-
-  // Somente a tela focada adquire o recurso compartilhado de localização.
-  useFocusEffect(useCallback(() => {
-    if (status !== "active") {
-      setGps({ status: "idle", message: "Localização aguarda conexão." });
-      return;
-    }
-    const lease = foregroundLocationService.acquire(loc => {
-      updateMyLocation(loc.coords.latitude, loc.coords.longitude, loc.coords.heading ?? undefined, loc.coords.speed ?? undefined);
-    }, setGps);
-    locationLease.current = lease;
-    return () => { locationLease.current = null; lease.release(); };
-  }, [status, updateMyLocation]));
 
   // [F-03] Quando o P2P conecta, leva para a tela de mapa.
   // push (não replace) preserva a volta ao chat desta tela;
@@ -109,10 +96,10 @@ export default function ActiveRideScreen() {
 
       <View style={s.locationCard}>
         <Text accessibilityLiveRegion="polite" style={s.waitingText}>{gps.message}</Text>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel={gps.canAskAgain === false ? "Verificar novamente" : "Tentar localização"}
-          disabled={status !== "active" || gps.status === "checking" || gps.status === "starting"}
-          onPress={() => locationLease.current?.retry()}>
-          <Text style={s.coords}>{gps.canAskAgain === false ? "Verificar novamente" : "Tentar localização"}</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={!gps.canRetry ? "Verificar novamente" : "Tentar localização"}
+          disabled={status !== "active" || gps.status === "requesting"}
+          onPress={() => rideLocationService.retry()}>
+          <Text style={s.coords}>{!gps.canRetry ? "Verificar novamente" : "Tentar localização"}</Text>
         </TouchableOpacity>
       </View>
 

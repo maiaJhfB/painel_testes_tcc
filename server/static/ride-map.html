@@ -23,6 +23,7 @@
   (() => {
     const parentOrigin = document.referrer ? new URL(document.referrer).origin : null;
     const notify = (type, extra = {}) => {
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({type, ...extra}));
       if (parentOrigin && window.parent !== window) window.parent.postMessage({type, ...extra}, parentOrigin);
     };
     if (!window.L) {
@@ -65,9 +66,8 @@
       return best;
     }
 
-    window.addEventListener('message',(event)=>{
-      if(event.source!==window.parent || event.origin!==parentOrigin || event.data?.type!=='ride-map-state')return;
-      const state=event.data;
+    function receiveState(state) {
+      if(state?.type!=='ride-map-state')return;
       const route=state.route;
       if(!route?.coordinates?.length)return;
       const phaseChanged=phase!==route.phase;
@@ -96,7 +96,12 @@
       }else if(following&&state.car&&!map.getBounds().pad(-.18).contains(car.getLatLng())){
         map.panTo(car.getLatLng(),{animate:true,duration:.8});
       }
+    }
+    window.addEventListener('message',(event)=>{
+      if(event.source!==window.parent || event.origin!==parentOrigin)return;
+      receiveState(event.data);
     });
+    if(window.ReactNativeWebView) window.receiveNativeRideState = receiveState;
     const resize = new ResizeObserver(()=>map.invalidateSize());
     resize.observe(document.getElementById('map'));
     notify('ride-map-ready');

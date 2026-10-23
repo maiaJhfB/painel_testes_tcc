@@ -7,6 +7,7 @@ describe("Mapa Leaflet nas duas janelas", () => {
   let map;
   let listeners;
   let parent;
+  let frameWindow;
 
   beforeEach(() => {
     document.body.innerHTML = '<div id="map"></div><div id="fallback"></div>';
@@ -19,7 +20,7 @@ describe("Mapa Leaflet nas duas janelas", () => {
     jest.spyOn(L, "map").mockImplementation((...args) => { map = createMap(...args); return map; });
     listeners = {};
     parent = { postMessage: jest.fn() };
-    const frameWindow = { L, parent, addEventListener: (name, handler) => { listeners[name] = handler; } };
+    frameWindow = { ReactNativeWebView: { postMessage: jest.fn() }, L, parent, addEventListener: (name, handler) => { listeners[name] = handler; } };
     const html = fs.readFileSync(path.join(__dirname, "../../server/static/ride-map.html"), "utf8");
     const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
     class ResizeObserver { observe() {} disconnect() {} }
@@ -61,4 +62,18 @@ describe("Mapa Leaflet nas duas janelas", () => {
     publish({ latitude: 0, longitude: 0 }, "https://unrelated.example");
     expect(driver.getLatLng().lng).toBe(-46.64);
   });
+  it("recebe coordenadas do APK pelo bridge nativo e confirma prontidão", () => {
+    expect(frameWindow.ReactNativeWebView.postMessage).toHaveBeenCalledWith(JSON.stringify({type: "ride-map-ready"}));
+    frameWindow.receiveNativeRideState({
+      type: "ride-map-state", stage: "in_progress", fitRevision: 1,
+      car: {latitude: -23.55, longitude: -46.64},
+      passenger: {latitude: -23.55, longitude: -46.64},
+      destination: {latitude: -23.56, longitude: -46.66},
+      route: {phase: "trip", coordinates: [[-46.64,-23.55],[-46.65,-23.55],[-46.66,-23.56]]}
+    });
+    const lines = Object.values(map._layers).filter(layer => layer instanceof L.Polyline);
+    expect(lines.some(line => line.options.color === "#10b981" && line.getLatLngs().length === 3)).toBe(true);
+    expect(Number.isFinite(map.getZoom())).toBe(true);
+  });
+
 });

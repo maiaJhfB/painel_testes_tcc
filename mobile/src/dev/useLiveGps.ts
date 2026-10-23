@@ -1,6 +1,5 @@
 import { useEffect } from "react";
-import { Platform } from "react-native";
-import { browserLocationService } from "@/services/BrowserLocationService";
+import { rideLocationService } from "@/services/rideLocationService";
 import { useGpsStore } from "@/store/useGpsStore";
 import { useP2PStore } from "@/store/useP2PStore";
 
@@ -8,8 +7,7 @@ import { useP2PStore } from "@/store/useP2PStore";
  * Publica a localização real do dispositivo durante a corrida.
  *
  * Fica no layout raiz para continuar recebendo posições mesmo quando o
- * usuário abre o chat. No celular nativo o GPS é controlado pelas telas via
- * ForegroundLocationService (expo-location); aqui só a versão web é atendida.
+ * usuário abre o chat. O adaptador usa expo-location no APK e a API do navegador na web.
  */
 export function useLiveGps(): void {
   const rideActive = useP2PStore((state) => state.status === "active");
@@ -18,13 +16,12 @@ export function useLiveGps(): void {
   const resetGps = useGpsStore((state) => state.reset);
 
   useEffect(() => {
-    if (Platform.OS !== "web") return;
     if (!rideActive) {
       resetGps();
       return;
     }
 
-    const lease = browserLocationService.acquire(
+    const lease = rideLocationService.acquire(
       (position) => {
         updateMyLocation(
           position.coords.latitude,

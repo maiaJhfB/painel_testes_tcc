@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { Platform } from "react-native";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useGpsStore } from "@/store/useGpsStore";
 import { useP2PStore } from "@/store/useP2PStore";
@@ -24,7 +23,7 @@ export function useRideGpsFallback(): void {
   const updateMyLocation = useP2PStore((state) => state.updateMyLocation);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !fallback || status !== "active" || role !== "driver") return;
+    if (!fallback || status !== "active" || role !== "driver") return;
     if (rideStatus === "completed" || rideStatus === "cancelled") return;
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -54,7 +53,7 @@ export function useRideGpsFallback(): void {
   }, [fallback, role, status, rideStatus, updateMyLocation]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !fallback || status !== "active" || role !== "client") return;
+    if (!fallback || status !== "active" || role !== "client") return;
     if (rideStatus === "completed" || rideStatus === "cancelled") return;
     const location = rideStatus === "in_progress" && peerLocation ? peerLocation : PICKUP_POINT;
     updateMyLocation(location.latitude, location.longitude);

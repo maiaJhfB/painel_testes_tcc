@@ -41,6 +41,7 @@
     "react-native-svg": "15.2.0",
     "react-native-web": "^0.19.13",
     "react-native-webrtc": "118.0.0",
+    "react-native-webview": "13.8.6",
     "siwe": "^2.3.2",
     "zustand": "^4.5.0"
   },

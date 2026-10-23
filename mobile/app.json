@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cooperativa",
     "slug": "cooperativa-demo",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "scheme": "cooperativa-demo",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -61,11 +61,7 @@
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "package": "br.com.cooperativa.plataforma.demo",
-      "config": {
-        "googleMaps": {
-          "apiKey": "COLOQUE_SUA_ANDROID_MAPS_KEY_AQUI"
-        }
-      }
+      "versionCode": 2
     },
     "ios": {
       "bundleIdentifier": "br.com.cooperativa.plataforma.demo",
@@ -73,9 +69,6 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "A Cooperativa usa sua localização para enviar ao parceiro via P2P.",
         "NSLocationAlwaysUsageDescription": "A Cooperativa usa sua localização para enviar ao parceiro via P2P."
-      },
-      "config": {
-        "googleMapsApiKey": "COLOQUE_SUA_IOS_MAPS_KEY_AQUI"
       }
     },
     "web": {
@@ -84,8 +77,8 @@
     },
     "extra": {
       "DEV_MOCK_ENABLED": true,
-      "DEV_SERVER_URL": "http://192.168.15.6:4747",
-      "SIGNALING_SERVER_URL": "http://192.168.15.6:4747",
+      "DEV_SERVER_URL": "http://10.240.138.245:4747",
+      "SIGNALING_SERVER_URL": "http://10.240.138.245:4747",
       "POLYGON_RPC_URL": "https://rpc-amoy.polygon.technology",
       "IDENTITY_CONTRACT_ADDRESS": "0x0000000000000000000000000000000000000000",
       "TURN_URL": "",

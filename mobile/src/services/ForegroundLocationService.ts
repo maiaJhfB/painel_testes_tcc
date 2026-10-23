@@ -83,7 +83,7 @@ class ForegroundLocationService {
       let permission = await Location.getForegroundPermissionsAsync();
       if (this.permissionPromise) permission = await this.permissionPromise;
       if (!this.current(owner, revision)) return;
-      if (permission.status !== "granted" && explicit && permission.canAskAgain) {
+      if (permission.status !== "granted" && (explicit || permission.status === "undetermined") && permission.canAskAgain) {
         permission = await this.requestPermission();
       }
       if (!this.current(owner, revision)) return;

@@ -78,7 +78,7 @@ Os parâmetros ficam em `server/demo_fares.py`. Reinicie a demo após alterá-lo
 
 O mapa usa **Leaflet + OpenStreetMap**, com ruas reais, zoom, arraste, botão de centralizar e identificação de motorista, passageiro e destino. O **OSRM** calcula o percurso de carro pelas ruas para as duas fases: aproximação e viagem. Distância e previsão de chegada diminuem conforme o motorista avança.
 
-Não é necessário cadastrar chave de API nem cartão. A base cartográfica precisa de internet. **O GPS é real no navegador**: ao entrar na corrida, o app pede permissão e usa a localização do dispositivo para posicionar o participante, publicar a posição à outra janela e calcular a rota a partir de onde ele está. O destino da demonstração acompanha o embarque real, a poucos quilômetros. A opção evita a chave paga do Google Maps e reutiliza a pilha Leaflet/OSM que já está no projeto; a versão nativa continua usando `expo-location` e `react-native-maps`, e nela a chave do Google Maps precisa estar configurada no `app.json` para o mapa base.
+Não é necessário cadastrar chave de API nem cartão. A base cartográfica precisa de internet. **O GPS é real no navegador**: ao entrar na corrida, o app pede permissão e usa a localização do dispositivo para posicionar o participante, publicar a posição à outra janela e calcular a rota a partir de onde ele está. O destino da demonstração acompanha o embarque real, a poucos quilômetros. A opção evita a chave paga do Google Maps e reutiliza a pilha Leaflet/OSM que já está no projeto; o APK também usa o mesmo mapa Leaflet/OSM do painel dentro de uma WebView. A localização do celular vem de `expo-location`, sem chave Google Maps, e continua ativa durante o chat.
 
 O navegador só libera o GPS em **HTTPS ou localhost**. Se a demo for aberta por um IP da rede em HTTP, ou se a permissão for negada, a tela mostra **Modo demonstração** e usa o trajeto simulado em São Paulo para preservar a gravação. É possível alternar na prática: permita o GPS para a localização real ou negue a permissão para o trajeto automático. Em um celular, prefira o app nativo (Expo/Dev Client) para o GPS real; a página web aberta pela rede em HTTP não recebe permissão de localização do navegador. O deslocamento continua durante o chat. Os controles de chegada, início e conclusão continuam sob comando do motorista.
 
@@ -102,3 +102,26 @@ Para validar apenas o servidor, sem iniciar o Expo:
 ```powershell
 .\iniciar-demo.ps1 -SemExpo -NaoAbrirPainel
 ```
+
+## APK 0.1.1 — GPS e mapa iguais ao painel
+
+Android e web compartilham `mobile/src/screens/RideMapScreen.tsx`: rotas OSRM,
+marcadores, ETA, distância, preço e controles da corrida. O mapa HTML servido
+por `/mock/map/view` atende iframe e WebView, por isso o servidor deve estar
+atualizado junto com o APK. O endereço continua configurável pelo QR do painel.
+
+O GPS é observado no layout durante toda a sessão, inclusive no chat. O Android
+solicita permissão de localização no primeiro uso. O indicador GPS REAL aparece
+somente após uma posição válida; falta de permissão, GPS desligado ou espera
+superior a 20 segundos ativa o trajeto demonstrativo, identificado na tela.
+Uma posição real recebida depois retoma automaticamente o acompanhamento.
+O destino da demonstração fica fixo a partir do embarque ao iniciar a viagem.
+A localização em segundo plano (app minimizado) não faz parte desta alteração.
+
+Para instalar a mudança é necessário gerar e instalar um novo APK; o APK antigo
+não inclui a dependência nativa `react-native-webview` 13.8.6. O build continua
+usando o perfil EAS `preview` e o identificador `.demo` existente.
+
+Validação em aparelho: parear passageiro/motorista pelos QRs, permitir localização,
+confirmar GPS REAL e precisão, alternar mapa/chat, iniciar a viagem e verificar o
+destino fixo. Repetir negando a permissão para validar MODO DEMO e Tentar GPS.
