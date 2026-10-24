@@ -30,7 +30,7 @@ RUN npm ci --no-audit --no-fund --legacy-peer-deps
 COPY mobile/ ./
 
 # Export estático (SPA) — o mesmo app que o Metro serve na porta 8085.
-RUN npx expo export --platform web --output-dir dist
+RUN EXPO_PUBLIC_DEV_SERVER_URL=http://localhost:4747 npx expo export --platform web --output-dir dist
 
 # ─── Etapa 2: runtime Flask + bundle web ─────────────────────────────────────
 FROM python:3.12-slim AS runtime
@@ -53,6 +53,7 @@ RUN pip install --no-cache-dir -r server/requirements.txt
 COPY server/ server/
 COPY docker/ docker/
 COPY --from=web /app/mobile/dist web/
+COPY --from=web /app/mobile/node_modules/leaflet/dist mobile/node_modules/leaflet/dist
 
 RUN chmod +x docker/entrypoint.sh \
     && mkdir -p .runtime \

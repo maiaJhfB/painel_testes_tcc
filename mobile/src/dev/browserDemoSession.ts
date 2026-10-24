@@ -17,6 +17,12 @@ function rememberContext(): void {
   if (peer === "client" || peer === "driver") {
     window.sessionStorage.setItem("cooperativa_demo_peer", peer);
   }
+  // O guard pode retirar a query antes do primeiro acesso assincrono ao cofre.
+  // Capture o isolamento por participante antes dessa navegacao.
+  if (session && (peer === "client" || peer === "driver")) {
+    const namespace = `${session}:${peer}`.replace(/[^a-zA-Z0-9:_-]/g, "");
+    window.sessionStorage.setItem("cooperativa_demo_namespace", namespace);
+  }
 }
 
 export function getBrowserDemoPeer(): BrowserDemoPeer | null {

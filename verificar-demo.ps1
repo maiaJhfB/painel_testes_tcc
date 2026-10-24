@@ -33,4 +33,4 @@ try {
     Pop-Location
 }
 
-Write-Host "✓ Ambiente demo aprovado para gravação." -ForegroundColor Green
+Write-Host "✓ Validacoes locais concluidas; aparelho, GPS fisico e servicos externos nao foram validados." -ForegroundColor Green

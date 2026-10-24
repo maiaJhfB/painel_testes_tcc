@@ -43,6 +43,8 @@ parser.add_argument("--port", type=int, default=int(os.environ.get("DEV_SERVER_P
 args, _ = parser.parse_known_args()
 
 PORT = args.port
+WEB_PORT = int(os.environ.get("DEMO_WEB_PORT", "8085"))
+INSTANCE_ID = os.environ.get("DEMO_INSTANCE_ID", "")
 DB_PATH = os.path.join(os.path.dirname(__file__), "demo-data.sqlite")
 SESSION_TTL = 5 * 60  # segundos
 DEMO_SERVER_VERSION = "ride-fare-v6"
@@ -399,6 +401,7 @@ def health():
         "server": "cooperativa-dev-server",
         "demo_version": DEMO_SERVER_VERSION,
         "port": PORT,
+        "instance_id": INSTANCE_ID,
         "active_sessions": sessions,
         "registered_identities": identities,
     })
@@ -1449,7 +1452,7 @@ const DEMO_KEYS={{
 const DRIVER_DID='0x1563915e194D8CfBA1943570603F7606A3115508';
 
 function mobileDemoUrl(peer){{
-  const base=window.location.protocol+'//'+window.location.hostname+':8085/';
+  const base=window.location.protocol+'//'+window.location.hostname+':{WEB_PORT}/';
   return base+'?demoSession='+encodeURIComponent(browserDemoSessionId)+'&demoPeer='+peer;
 }}
 

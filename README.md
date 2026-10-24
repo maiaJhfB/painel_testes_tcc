@@ -1,127 +1,43 @@
-# Cooperativa — ambiente isolado de demonstração
+# Demo atualizada — 24/10/2026
 
-Esta pasta contém uma cópia executável da versão mobile, um servidor local de demonstração e dados próprios. Nada aqui altera o código ou o banco do aplicativo em `tcc-2026`.
+Versão baseada em [maiaJhfB/painel_testes_tcc](https://github.com/maiaJhfB/painel_testes_tcc), revisão `c3c8e02b493253725098138cce18b21a58c181ec`, com ajustes locais de execução, portas e mapa.
 
-## Uso rápido no Windows
+## Iniciar
 
-1. Execute `verificar-demo.bat` antes da gravação.
-2. Execute `iniciar-demo.bat`.
-3. No painel em <http://localhost:4747/panel>, clique em **Iniciar sessão passageiro + motorista**.
-4. O navegador abrirá duas janelas independentes, limitadas à largura mobile. Entre nas duas com a senha **`Demo@123`** para executar a corrida completa no mesmo PC, sem importar chaves.
-5. Como alternativa, instale o APK da demo e leia o QR do passageiro em um celular e o do motorista em outro, na mesma rede Wi-Fi. O QR code do Expo continua disponível para abrir a versão web no navegador do celular.
-6. Entre takes, execute `resetar-demo.bat`.
-7. Ao terminar, execute `parar-demo.bat`.
+Nesta pasta, abra **iniciar-demo.bat**. O inicializador prepara as dependências ausentes, compila o aplicativo web e abre **http://localhost:4748/panel**. Não feche a janela durante a preparação. Os serviços continuam em segundo plano após a mensagem de sucesso.
 
-O roteiro completo está em `ROTEIRO_DEMONSTRACAO.md`.
+No painel, clique em **Iniciar sessão passageiro + motorista**. Entre nas duas janelas com **Demo@123**. O aplicativo web abre na porta **8086**. O painel/API usa **4748**. Essas portas são próprias desta versão; a demo anterior na porta 4747 foi preservada.
 
-## APK Android e pareamento por QR code
-
-O painel de testes agora possui a seção **Conectar APK por QR code**, com dois códigos: um para o passageiro (Vitor Maia) e outro para o motorista (Carlos Silva). O QR carrega o endereço do servidor da demo, a sessão e o papel do aparelho. No APK, toque em **Ler QR do painel** na tela inicial ou na Home e escaneie o código correspondente. A imagem é gerada localmente com a biblioteca MIT `qrcodejs`, sem CDN e sem internet.
-
-- O computador e o celular precisam estar na mesma rede Wi-Fi. O QR usa o IP local detectado pelo servidor (por exemplo, `http://192.168.15.6:4747`).
-- Se o Windows perguntar, permita o acesso à porta `4747` na rede privada.
-- O APK instala como **Cooperativa Demo** (`br.com.cooperativa.plataforma.demo`), separado do aplicativo principal.
-- O QR só configura servidor/sessão/papel. A entrada continua sendo feita com a senha **`Demo@123`**; em um aparelho sem identidade, a conta de demonstração do papel escolhido é preparada automaticamente.
-- Se o aparelho já tiver outra identidade, o app avisa: o QR não apaga chaves existentes. Remova a identidade atual no Perfil antes de trocar de conta.
-- A leitura usa a câmera do celular e não envia fotos. O APK inclui `expo-camera` e permite HTTP local para falar com o servidor da demo.
-
-Para gerar um novo APK a partir desta pasta:
+Ao abrir novamente, o inicializador reaproveita a mesma sessão saudável, sem recompilar ou alterar dados. Se os processos anteriores já terminaram ou seus PIDs foram reutilizados, os registros comprovadamente antigos são arquivados em .runtime/previous-processes e uma nova sessão é iniciada. Nenhum processo é encerrado nessa recuperação. Se houver porta ocupada, sessão parcial ou identidade que o Windows não permita comprovar, a partida é bloqueada e os processos são preservados. Use parar-demo para encerrar uma sessão própria antes de trocar as portas. Para usar outras portas:
 
 ```powershell
-cd mobile
-.\scripts\build-apk.ps1
+.\iniciar-demo.bat -PortaApi 4749 -PortaWeb 8087
 ```
 
-O script copia o app para uma pasta limpa em `C:\programming\cooperativa-demo-apk-*` (o EAS exige um repositório Git próprio, e esta pasta está dentro do repositório maior do TCC), instala as dependências, cria o commit local de build e envia o perfil `preview`. O perfil gera um APK assinado no EAS. O arquivo `.easignore` mantém `node_modules`, caches e artefatos fora do envio. O projeto EAS é `@vitor_maia/cooperativa-demo`.
+O parâmetro `-SemExpo` inicia somente a API; as duas janelas requerem o modo completo. `-NaoAbrirPainel` evita abrir o navegador automaticamente.
 
-## Isolamento
+## Encerrar, verificar e limpar dados de demonstração
 
-- Aplicativo: nome visível **Cooperativa**, igual ao produto final; scheme `cooperativa-demo` e IDs nativos terminados em `.demo` mantêm o isolamento técnico.
-- APK Android: `br.com.cooperativa.plataforma.demo`, com câmera para o QR e HTTP local habilitado somente nesta build de demonstração.
-- Metro: porta `8085`.
-- Navegador: duas sessões isoladas por janela, com largura máxima de `430 px`.
-- API/painel: porta `4747`.
-- Banco: `server/demo-data.sqlite`.
-- Python: `.venv` local.
-- Dependências JS: `mobile/node_modules` local, sem junction para o projeto principal.
-- Logs e caches: `.runtime` local.
+- Encerrar esta versão: `parar-demo.bat`. Apenas os processos registrados e verificados desta cópia são encerrados.
+- Verificações locais: `verificar-demo.bat`. Incluem testes de servidor/app, tipos, rotas e compilação web.
+- Recomeçar uma gravação: `resetar-demo.bat`. Apaga somente os dados demonstrativos da instância nova comprovada. Com porta alternativa, passe `-PortaApi 4749`.
 
-## Escopo técnico da demo
+O banco desta cópia fica em `atualizado/server/demo-data.sqlite`, e os logs em `atualizado/.runtime/`. As identidades pessoais, os bancos e as dependências da versão anterior não foram migrados nem substituídos. Novas contas são apenas as contas públicas da demonstração.
 
-A carteira Ethereum e a assinatura SIWE são reais. A senha desbloqueia a chave local antes de assinar o login. No celular, o cofre cifrado usa o SecureStore do sistema; no navegador, o cofre e o perfil público ficam no armazenamento local, separados por sessão de demonstração e participante para reproduzir dois dispositivos sem misturar identidades. Blockchain e signaling são substituídos por réplicas locais determinísticas.
+## Mapas e celular
 
-Na sessão de duas janelas, passageiro e motorista percorrem as telas reais: desbloqueio por senha, autenticação, solicitação, chamada recebida, aceite, mapa, chat e estados da corrida. A importação continua disponível para recuperação de uma identidade. No modo de um único celular, o motorista de apoio também pode operar automaticamente nos bastidores.
+A atualização integra a tela de mapa compartilhada, localização nativa com recuperação de erros e mapa Leaflet em WebView no Android. O mapa usa arquivos Leaflet locais; ruas/rotas externas precisam de internet e podem mostrar modo aproximado. GPS negado/indisponível pode usar o percurso de demonstração, claramente indicado na interface. Testes automatizados não comprovam GPS físico ou deslocamento real.
 
-## Acesso por senha
+O APK antigo não foi atualizado. Para usar o novo componente nativo WebView é necessário um novo APK compatível. Nenhum APK foi gerado, instalado ou publicado nesta operação. O QR configura servidor/sessão/papel e não apaga identidades existentes. No navegador, GPS exige localhost ou HTTPS; HTTP pelo IP da rede não libera GPS.
 
-- As novas sessões de duas janelas já possuem os cofres de Vitor Maia (passageiro) e Carlos Silva (motorista), ambos com senha **`Demo@123`**. Essas contas são públicas e exclusivas da demonstração; nunca use suas chaves fora dela.
-- Para uma identidade pessoal, escolha **Criar minha conta → Nova identidade**, ou **Usar outra identidade → Importar identidade**, e defina uma senha com pelo menos 8 caracteres. A chave só é informada na importação inicial.
-- Identidades guardadas no formato antigo pedem a criação de uma senha uma única vez, preservando a chave e o DID.
-- A chave é cifrada no formato Ethereum Keystore V3, com scrypt e AES-128-CTR. A senha não é armazenada nem enviada ao servidor; a chave decifrada permanece somente na memória enquanto a conta está desbloqueada.
-- **Sair e bloquear conta** preserva o cofre e exige a senha na próxima entrada. Recarregar o app também volta ao login bloqueado. **Remover identidade deste dispositivo** é uma ação separada, com confirmação.
-- Exportar a chave no Perfil exige informar novamente a senha. Guarde um backup seguro: não há recuperação de senha centralizada. Apagar os dados do navegador também apaga o cofre local.
-- Uma nova sessão criada no painel representa outros dois dispositivos. Para continuar com uma identidade pessoal já importada, reutilize a mesma janela/URL da sessão.
+## Estrutura e preservação
 
-## Preço simulado na chamada e no aceite
+O servidor anterior estava ativo durante a atualização. Por isso a aplicação atualizada está integralmente em `atualizado/`, com dependências próprias. Os atalhos antigos continuam correspondendo à versão antiga. Nenhum serviço antigo foi encerrado, recarregado ou alterado.
 
-Após verificar o motorista, o passageiro vê a estimativa e seu detalhamento antes de tocar em **Chamar por R$ …**. O motorista recebe a mesma oferta e confirma em **Aceitar por R$ …**. O preço combinado continua visível no mapa e no chat.
+O arquivo `mobile/app.json` da versão antiga foi preservado. A cópia nova conserva configurações locais compatíveis, com versão 0.1.1/versionCode 2. Seu endereço padrão é localhost:4748; o inicializador usa `EXPO_PUBLIC_DEV_SERVER_URL` para configurar o bundle sem reescrever esse arquivo.
 
-Premissas exclusivamente demonstrativas: **R$ 4,50 de base + R$ 2,00 por km + R$ 0,30 por minuto**, com mínimo de **R$ 8,00**. O cálculo usa distância e duração estimadas da rota embarque → destino; não cobra a aproximação do motorista e não usa o tempo acelerado da animação. Exemplo: 5 km e 15 min resultam em R$ 19,00. Não há pagamento ou cobrança real.
+## Docker opcional
 
-O documento de referência `pretcc_final (2).docx` compara custos anuais de infraestrutura e não define tarifa de corrida. Estes valores são premissas da demo, não resultados do TCC. A redução de 87% do cenário arquitetural não é aplicada como desconto ao passageiro. O GPS real altera o mapa e o acompanhamento do deslocamento, mas o preço de demonstração continua sendo calculado sobre o roteiro fixo embarque → destino.
+Use `atualizado/` como contexto de build. A imagem foi corrigida para incluir os arquivos Leaflet no runtime, mas não foi construída ou publicada nesta atualização. O padrão interno Docker continua sendo API4747/web8085. Para usar portas diferentes, API, painel e endereço compilado no bundle precisam concordar; para a execução pronta e verificada neste PC, prefira o atalho Windows acima.
 
-Cada estimativa vale por 10 minutos para realizar a chamada e fica vinculada ao passageiro e ao motorista. Depois de enviada, uma cópia fica salva na sessão: o aceite preserva esse preço, mesmo se a rota mudar ou a estimativa original expirar. O servidor ignora preços enviados pelo navegador e utiliza a estimativa que ele próprio calculou. Se o OSRM falhar, o cartão informa que a rota é aproximada.
-
-Os parâmetros ficam em `server/demo_fares.py`. Reinicie a demo após alterá-los; novas estimativas usam a nova configuração, sem alterar chamadas já enviadas. O banco recebe uma migração aditiva para preservar os dados anteriores.
-
-## Mapa e rota na sessão do navegador
-
-O mapa usa **Leaflet + OpenStreetMap**, com ruas reais, zoom, arraste, botão de centralizar e identificação de motorista, passageiro e destino. O **OSRM** calcula o percurso de carro pelas ruas para as duas fases: aproximação e viagem. Distância e previsão de chegada diminuem conforme o motorista avança.
-
-Não é necessário cadastrar chave de API nem cartão. A base cartográfica precisa de internet. **O GPS é real no navegador**: ao entrar na corrida, o app pede permissão e usa a localização do dispositivo para posicionar o participante, publicar a posição à outra janela e calcular a rota a partir de onde ele está. O destino da demonstração acompanha o embarque real, a poucos quilômetros. A opção evita a chave paga do Google Maps e reutiliza a pilha Leaflet/OSM que já está no projeto; o APK também usa o mesmo mapa Leaflet/OSM do painel dentro de uma WebView. A localização do celular vem de `expo-location`, sem chave Google Maps, e continua ativa durante o chat.
-
-O navegador só libera o GPS em **HTTPS ou localhost**. Se a demo for aberta por um IP da rede em HTTP, ou se a permissão for negada, a tela mostra **Modo demonstração** e usa o trajeto simulado em São Paulo para preservar a gravação. É possível alternar na prática: permita o GPS para a localização real ou negue a permissão para o trajeto automático. Em um celular, prefira o app nativo (Expo/Dev Client) para o GPS real; a página web aberta pela rede em HTTP não recebe permissão de localização do navegador. O deslocamento continua durante o chat. Os controles de chegada, início e conclusão continuam sob comando do motorista.
-
-As rotas fixas são armazenadas por 30 dias em `.runtime/routes`; as rotas calculadas a partir do GPS ficam em memória por poucos minutos. Consultas ao serviço público são limitadas a uma por segundo no servidor. Se o roteamento estiver indisponível, a tela informa que o traçado exibido é aproximado. Não há dados de trânsito em tempo real.
-
-O uso dos servidores públicos destina-se à demonstração acadêmica de baixo volume, com atribuição visível no mapa. Para outro provedor OSRM, configure `DEMO_ROUTER_URL` antes de iniciar.
-
-Referências: [Leaflet](https://leafletjs.com/), [política do OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/), [servidor público OSRM](https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server).
-
-## Comandos úteis
-
-```powershell
-.\verificar-demo.ps1
-.\iniciar-demo.ps1
-.\resetar-demo.ps1
-.\parar-demo.ps1
-```
-
-Para validar apenas o servidor, sem iniciar o Expo:
-
-```powershell
-.\iniciar-demo.ps1 -SemExpo -NaoAbrirPainel
-```
-
-## APK 0.1.1 — GPS e mapa iguais ao painel
-
-Android e web compartilham `mobile/src/screens/RideMapScreen.tsx`: rotas OSRM,
-marcadores, ETA, distância, preço e controles da corrida. O mapa HTML servido
-por `/mock/map/view` atende iframe e WebView, por isso o servidor deve estar
-atualizado junto com o APK. O endereço continua configurável pelo QR do painel.
-
-O GPS é observado no layout durante toda a sessão, inclusive no chat. O Android
-solicita permissão de localização no primeiro uso. O indicador GPS REAL aparece
-somente após uma posição válida; falta de permissão, GPS desligado ou espera
-superior a 20 segundos ativa o trajeto demonstrativo, identificado na tela.
-Uma posição real recebida depois retoma automaticamente o acompanhamento.
-O destino da demonstração fica fixo a partir do embarque ao iniciar a viagem.
-A localização em segundo plano (app minimizado) não faz parte desta alteração.
-
-Para instalar a mudança é necessário gerar e instalar um novo APK; o APK antigo
-não inclui a dependência nativa `react-native-webview` 13.8.6. O build continua
-usando o perfil EAS `preview` e o identificador `.demo` existente.
-
-Validação em aparelho: parear passageiro/motorista pelos QRs, permitir localização,
-confirmar GPS REAL e precisão, alternar mapa/chat, iniciar a viagem e verificar o
-destino fixo. Repetir negando a permissão para validar MODO DEMO e Tentar GPS.
+Registro de origem, comparação, parecer e evidências: `.atualizacao-2026-10-24/`. Sem commit, push, deploy ou interação com aparelho.

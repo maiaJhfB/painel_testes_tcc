@@ -1,371 +1,151 @@
-﻿# # ====================================================================
-# # iniciar-demo.ps1 — Inicia o Ambiente Isolado de Demonstração (TCC)
-# # ====================================================================
-
-# param(
-#     [switch]$SemExpo,
-#     [switch]$NaoAbrirPainel
-# )
-
-# $ErrorActionPreference = "Stop"
-
-# $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
-# $MOBILE_DIR = Join-Path $SCRIPT_DIR "mobile"
-# $SERVER_DIR = Join-Path $SCRIPT_DIR "server"
-# $APP_JSON = Join-Path $MOBILE_DIR "app.json"
-# $RUNTIME_DIR = Join-Path $SCRIPT_DIR ".runtime"
-# $VENV_DIR = Join-Path $SCRIPT_DIR ".venv"
-# $DEMO_PYTHON = Join-Path $VENV_DIR "Scripts\python.exe"
-# $READY_FILE = Join-Path $RUNTIME_DIR "server.ready"
-# $DEV_PORT = 4747
-# $METRO_PORT = 8085
-# $SERVER_VERSION = "ride-fare-v6"
-
-# New-Item -ItemType Directory -Path $RUNTIME_DIR -Force | Out-Null
-# $LOCAL_TEMP_DIR = Join-Path $RUNTIME_DIR "temp"
-# New-Item -ItemType Directory -Path $LOCAL_TEMP_DIR -Force | Out-Null
-# $env:TEMP = $LOCAL_TEMP_DIR
-# $env:TMP = $LOCAL_TEMP_DIR
-
-# Write-Host ""
-# Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-# Write-Host "║     COOPERATIVA — AMBIENTE ISOLADO DE DEMONSTRAÇÃO (TCC)       ║" -ForegroundColor Cyan
-# Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-# Write-Host ""
-
-# # 1. Detectar IP Local da Máquina (para acesso via celular físico na mesma rede)
-# $localIp = $null
-# try {
-#     $localIp = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop | Where-Object {
-#         $_.InterfaceAlias -notmatch "Loopback|vEthernet|Virtual" -and $_.IPAddress -notmatch "^169\.254\."
-#     } | Select-Object -First 1).IPAddress
-# } catch {
-#     # Alguns ambientes Windows restringem o provedor CIM. Usa socket UDP
-#     # apenas para descobrir a interface local, sem enviar dados.
-#     try {
-#         $localIp = python -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(('8.8.8.8',80)); print(s.getsockname()[0]); s.close()"
-#         $localIp = $localIp.Trim()
-#     } catch {}
-# }
-
-# if (-not $localIp) {
-#     $localIp = "localhost"
-# }
-
-# Write-Host "✓ [1/5] IP Local Detectado: $localIp" -ForegroundColor Green
-# Write-Host "       Servidor Mock / API: http://$localIp`:$DEV_PORT" -ForegroundColor Gray
-# Write-Host "       Painel Web da Demo:  http://localhost:$DEV_PORT/panel" -ForegroundColor Gray
-# Write-Host "       Expo Metro (Isolado): http://localhost:$METRO_PORT" -ForegroundColor Gray
-# Write-Host ""
-
-# # 2. Atualizar somente a configuração copiada da demo
-# Write-Host "✓ [2/5] Configurando app.json isolado com IP $localIp..." -ForegroundColor Yellow
-# $appConfig = Get-Content $APP_JSON -Raw -Encoding UTF8 | ConvertFrom-Json
-# $appConfig.expo.extra.DEV_MOCK_ENABLED = $true
-# $appConfig.expo.extra.DEV_SERVER_URL = "http://$localIp`:$DEV_PORT"
-# $appConfig.expo.extra.SIGNALING_SERVER_URL = "http://$localIp`:$DEV_PORT"
-# $appConfig | ConvertTo-Json -Depth 10 | Set-Content $APP_JSON -Encoding UTF8
-
-# # 3. Preparar o Python da demo sem alterar a instalação global
-# if (-not (Test-Path $DEMO_PYTHON)) {
-#     Write-Host "  Preparando ambiente Python local..." -ForegroundColor Gray
-#     python -m venv --without-pip --system-site-packages $VENV_DIR
-# }
-
-# & $DEMO_PYTHON -c "import flask" 2>$null
-# if ($LASTEXITCODE -ne 0) {
-#     Write-Host "  Instalando dependências Python da demo..." -ForegroundColor Gray
-#     python -m pip install --target (Join-Path $VENV_DIR "Lib\site-packages") -r (Join-Path $SERVER_DIR "requirements.txt")
-# }
-
-# Write-Host "✓ [3/5] Inicializando banco SQLite isolado e dados de demonstração..." -ForegroundColor Yellow
-# & $DEMO_PYTHON -c "import sys; sys.path.insert(0, '$($SERVER_DIR.Replace('\', '/'))'); import server; server.init_db()"
-
-# # Iniciar o servidor Python em segundo plano numa nova janela
-# Write-Host "✓ [4/5] Iniciando Servidor Demo na porta $DEV_PORT..." -ForegroundColor Green
-# try {
-#     $existingHealth = Invoke-RestMethod -Uri "http://127.0.0.1:$DEV_PORT/health" -TimeoutSec 5
-# } catch {
-#     $existingHealth = $null
-# }
-
-# $serverIsCurrent = $existingHealth `
-#     -and $existingHealth.server -eq "cooperativa-dev-server" `
-#     -and $existingHealth.demo_version -eq $SERVER_VERSION
-
-# if ($serverIsCurrent) {
-#     Write-Host "  Servidor da demo já estava ativo; reutilizando-o." -ForegroundColor Gray
-# } else {
-#     $occupied = Get-NetTCPConnection -LocalPort $DEV_PORT -State Listen -ErrorAction SilentlyContinue
-#     if ($occupied) {
-#         $listenerPid = $occupied | Select-Object -First 1 -ExpandProperty OwningProcess
-#         $listenerProcess = Get-Process -Id $listenerPid -ErrorAction SilentlyContinue
-#         $isOwnedDemoServer = $listenerProcess -and $listenerProcess.Path -eq $DEMO_PYTHON
-#         if (-not $isOwnedDemoServer) {
-#             try {
-#                 $commandLine = (Get-CimInstance Win32_Process -Filter "ProcessId = $listenerPid" -ErrorAction Stop).CommandLine
-#                 $isOwnedDemoServer = $commandLine -like "*ambiente-demo*server.py*"
-#             } catch {}
-#         }
-
-#         if ($existingHealth -and $existingHealth.server -eq "cooperativa-dev-server" -and $isOwnedDemoServer) {
-#             Write-Host "  Atualizando processo antigo da própria demo..." -ForegroundColor Gray
-#             Stop-Process -Id $listenerPid -Force
-#             for ($waitAttempt = 0; $waitAttempt -lt 20; $waitAttempt++) {
-#                 if (-not (Get-NetTCPConnection -LocalPort $DEV_PORT -State Listen -ErrorAction SilentlyContinue)) { break }
-#                 Start-Sleep -Milliseconds 150
-#             }
-#         } else {
-#             throw "A porta $DEV_PORT já está ocupada por outro programa. Feche-o ou execute parar-demo.bat."
-#         }
-#     }
-
-#     Remove-Item -LiteralPath $READY_FILE -Force -ErrorAction SilentlyContinue
-#     $serverProcess = Start-Process $DEMO_PYTHON `
-#         -ArgumentList "server.py --port $DEV_PORT" `
-#         -WorkingDirectory $SERVER_DIR `
-#         -RedirectStandardOutput (Join-Path $RUNTIME_DIR "server.log") `
-#         -RedirectStandardError (Join-Path $RUNTIME_DIR "server-error.log") `
-#         -PassThru `
-#         -WindowStyle Hidden
-#     Set-Content -Path (Join-Path $RUNTIME_DIR "server.pid") -Value $serverProcess.Id -Encoding ascii
-# }
-
-# $ready = $false
-# for ($attempt = 0; $attempt -lt 20; $attempt++) {
-#     try {
-#         $health = Invoke-RestMethod -Uri "http://127.0.0.1:$DEV_PORT/health" -TimeoutSec 5
-#         if ($health.ok) { $ready = $true; break }
-#     } catch {}
-#     if (Test-Path $READY_FILE) { $ready = $true; break }
-#     Start-Sleep -Milliseconds 250
-# }
-# if (-not $ready) {
-#     throw "O servidor da demo não ficou pronto. Consulte .runtime\server-error.log."
-# }
-
-# $identityCount = if ($health) { $health.registered_identities } else { 2 }
-# Write-Host "✓ [5/5] Servidor validado: $identityCount identidades disponíveis." -ForegroundColor Green
-
-# # Abrir o painel web no navegador
-# if (-not $NaoAbrirPainel) {
-#     Start-Process "http://localhost:$DEV_PORT/panel"
-# }
-
-# Write-Host ""
-# Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
-# Write-Host "  🎬 MODO DEMO ATIVO E PRONTO PARA GRAVAÇÃO" -ForegroundColor Cyan
-# Write-Host "  🖥️  Mesmo PC:       No painel, clique em 'Iniciar sessão passageiro + motorista'" -ForegroundColor White
-# Write-Host "  📱 Celular Físico: Abra o app no celular (conectado ao mesmo Wi-Fi)" -ForegroundColor White
-# Write-Host "  🌐 Painel Web:     http://localhost:$DEV_PORT/panel (aberto no navegador)" -ForegroundColor White
-# Write-Host "  ⚡ Metro Bundler:   Porta $METRO_PORT (sem conflito com QA)" -ForegroundColor White
-# Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
-# Write-Host ""
-# Write-Host "Pressione Ctrl+C quando desejar encerrar a demo." -ForegroundColor Yellow
-# Write-Host ""
-
-# # Iniciar o Expo no diretório mobile
-# if ($SemExpo) {
-#     Write-Host "Modo servidor concluído (-SemExpo)." -ForegroundColor Yellow
-#     exit 0
-# }
-
-# if (-not (Test-Path (Join-Path $MOBILE_DIR "node_modules\.bin\expo.cmd"))) {
-#     throw "Dependências mobile ausentes. Execute npm ci dentro de ambiente-demo\mobile."
-# }
-
-# Set-Location $MOBILE_DIR
-# $env:BROWSER = "none"
-# & .\node_modules\.bin\expo.cmd start --web --clear --port $METRO_PORT
-# ====================================================================
-# iniciar-demo.ps1 — Inicia o Ambiente Isolado de Demonstração (TCC)
-# ====================================================================
-
-param(
+﻿param(
     [switch]$SemExpo,
-    [switch]$NaoAbrirPainel
+    [switch]$NaoAbrirPainel,
+    [ValidateRange(1024,65535)][int]$PortaApi = 4748,
+    [ValidateRange(1024,65535)][int]$PortaWeb = 8086
 )
-
-$ErrorActionPreference = "Stop"
-
-$SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
-$MOBILE_DIR = Join-Path $SCRIPT_DIR "mobile"
-$SERVER_DIR = Join-Path $SCRIPT_DIR "server"
-$APP_JSON = Join-Path $MOBILE_DIR "app.json"
-$RUNTIME_DIR = Join-Path $SCRIPT_DIR ".runtime"
-$VENV_DIR = Join-Path $SCRIPT_DIR ".venv"
-$DEMO_PYTHON = Join-Path $VENV_DIR "Scripts\python.exe"
-$READY_FILE = Join-Path $RUNTIME_DIR "server.ready"
-$DEV_PORT = 4747
-$METRO_PORT = 8085
-$SERVER_VERSION = "ride-fare-v6"
-
-New-Item -ItemType Directory -Path $RUNTIME_DIR -Force | Out-Null
-$LOCAL_TEMP_DIR = Join-Path $RUNTIME_DIR "temp"
-New-Item -ItemType Directory -Path $LOCAL_TEMP_DIR -Force | Out-Null
-$env:TEMP = $LOCAL_TEMP_DIR
-$env:TMP = $LOCAL_TEMP_DIR
-
-Write-Host ""
-Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║     COOPERATIVA — AMBIENTE ISOLADO DE DEMONSTRAÇÃO (TCC)       ║" -ForegroundColor Cyan
-Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-Write-Host ""
-
-# 1. Detectar IP Local da Máquina (para acesso via celular físico na mesma rede)
-$localIp = $null
-try {
-    $localIp = [Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
-        Where-Object {
-            $_.OperationalStatus -eq 'Up' -and
-            $_.NetworkInterfaceType -in @('Wireless80211', 'Ethernet') -and
-            $_.Description -notmatch 'Virtual|VMware|Hyper-V' -and
-            $_.GetIPProperties().GatewayAddresses.Count -gt 0
-        } | Sort-Object @{ Expression = { if ($_.NetworkInterfaceType -eq 'Wireless80211') { 0 } else { 1 } } } |
-        ForEach-Object { $_.GetIPProperties().UnicastAddresses } |
-        Where-Object { $_.Address.AddressFamily -eq 'InterNetwork' -and $_.Address.ToString() -notmatch '^(169\.254\.|127\.)' } |
-        Select-Object -First 1 -ExpandProperty Address |
-        ForEach-Object { $_.ToString() }
-} catch {
-    # Alguns ambientes Windows restringem o provedor CIM. Usa socket UDP
-    # apenas para descobrir a interface local, sem enviar dados.
-    try {
-        $localIp = python -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(('8.8.8.8',80)); print(s.getsockname()[0]); s.close()"
-        $localIp = $localIp.Trim()
-    } catch {}
-}
-
-if (-not $localIp) {
-    $localIp = "localhost"
-}
-
-Write-Host "✓ [1/5] IP Local Detectado: $localIp" -ForegroundColor Green
-Write-Host "       Servidor Mock / API: http://$localIp`:$DEV_PORT" -ForegroundColor Gray
-Write-Host "       Painel Web da Demo:  http://localhost:$DEV_PORT/panel" -ForegroundColor Gray
-Write-Host "       Expo Metro (Isolado): http://localhost:$METRO_PORT" -ForegroundColor Gray
-Write-Host ""
-
-# 2. Atualizar somente a configuração copiada da demo
-Write-Host "✓ [2/5] Configurando app.json isolado com IP $localIp..." -ForegroundColor Yellow
-$appConfig = Get-Content $APP_JSON -Raw -Encoding UTF8 | ConvertFrom-Json
-$appConfig.expo.extra.DEV_MOCK_ENABLED = $true
-$appConfig.expo.extra.DEV_SERVER_URL = "http://$localIp`:$DEV_PORT"
-$appConfig.expo.extra.SIGNALING_SERVER_URL = "http://$localIp`:$DEV_PORT"
-$appConfig | ConvertTo-Json -Depth 10 | Set-Content $APP_JSON -Encoding UTF8
-
-# 3. Preparar o Python da demo sem alterar a instalação global
-if (-not (Test-Path $DEMO_PYTHON)) {
-    Write-Host "  Preparando ambiente Python local..." -ForegroundColor Gray
-    python -m venv --without-pip --system-site-packages $VENV_DIR
-}
-
-& $DEMO_PYTHON -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('flask') else 1)"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  Instalando dependências Python da demo..." -ForegroundColor Gray
-    & $DEMO_PYTHON -m ensurepip --upgrade
-    if ($LASTEXITCODE -ne 0) { throw "Nao foi possivel preparar pip no ambiente Python da demo." }
-    & $DEMO_PYTHON -m pip install -r (Join-Path $SERVER_DIR "requirements.txt")
-    if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar as dependencias Python da demo." }
-    & $DEMO_PYTHON -c "import flask"
-    if ($LASTEXITCODE -ne 0) { throw "Flask continua indisponivel no ambiente Python da demo." }
-}
-
-Write-Host "✓ [3/5] Inicializando banco SQLite isolado e dados de demonstração..." -ForegroundColor Yellow
-& $DEMO_PYTHON -c "import sys; sys.path.insert(0, '$($SERVER_DIR.Replace('\', '/'))'); import server; server.init_db()"
-
-# Iniciar o servidor Python em segundo plano numa nova janela
-Write-Host "✓ [4/5] Iniciando Servidor Demo na porta $DEV_PORT..." -ForegroundColor Green
-try {
-    $existingHealth = Invoke-RestMethod -Uri "http://127.0.0.1:$DEV_PORT/health" -TimeoutSec 5
-} catch {
-    $existingHealth = $null
-}
-
-$serverIsCurrent = $existingHealth `
-    -and $existingHealth.server -eq "cooperativa-dev-server" `
-    -and $existingHealth.demo_version -eq $SERVER_VERSION
-
-if ($serverIsCurrent) {
-    Write-Host "  Servidor da demo já estava ativo; reutilizando-o." -ForegroundColor Gray
-} else {
-    $occupied = Get-NetTCPConnection -LocalPort $DEV_PORT -State Listen -ErrorAction SilentlyContinue
-    if ($occupied) {
-        $listenerPid = $occupied | Select-Object -First 1 -ExpandProperty OwningProcess
-        $listenerProcess = Get-Process -Id $listenerPid -ErrorAction SilentlyContinue
-        $isOwnedDemoServer = $listenerProcess -and $listenerProcess.Path -eq $DEMO_PYTHON
-        if (-not $isOwnedDemoServer) {
-            try {
-                $commandLine = (Get-CimInstance Win32_Process -Filter "ProcessId = $listenerPid" -ErrorAction Stop).CommandLine
-                $isOwnedDemoServer = $commandLine -like "*ambiente-demo*server.py*"
-            } catch {}
-        }
-
-        if ($existingHealth -and $existingHealth.server -eq "cooperativa-dev-server" -and $isOwnedDemoServer) {
-            Write-Host "  Atualizando processo antigo da própria demo..." -ForegroundColor Gray
-            Stop-Process -Id $listenerPid -Force
-            for ($waitAttempt = 0; $waitAttempt -lt 20; $waitAttempt++) {
-                if (-not (Get-NetTCPConnection -LocalPort $DEV_PORT -State Listen -ErrorAction SilentlyContinue)) { break }
-                Start-Sleep -Milliseconds 150
-            }
+. (Join-Path $PSScriptRoot 'processos-demo.ps1')
+$previous = @{}
+$staleRecords = @()
+foreach ($serviceName in @('server','web')) {
+    $recordPath = Join-Path $DemoRuntime "$serviceName.process.json"
+    if (Test-Path -LiteralPath $recordPath) {
+        try { $record = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json }
+        catch { throw 'Registro de servico invalido; confira a sessao anterior antes de iniciar.' }
+        $identity = Get-DemoProcessState $record
+        if ($identity.state -in @('Absent','ReusedPid')) {
+            $staleRecords += @{path=$recordPath;record=$record;hash=(Get-FileHash -LiteralPath $recordPath).Hash}
+        } elseif ($identity.state -eq 'Owned') {
+            $previous[$serviceName] = $record
         } else {
-            throw "A porta $DEV_PORT já está ocupada por outro programa. Feche-o ou execute parar-demo.bat."
+            throw 'Existe registro de sessao sem identidade verificavel. Nenhum processo ou arquivo foi alterado. Confira a sessao anterior antes de arquivar manualmente seu registro .runtime/*.process.json.'
         }
     }
-
-    Remove-Item -LiteralPath $READY_FILE -Force -ErrorAction SilentlyContinue
-    $serverProcess = Start-Process $DEMO_PYTHON `
-        -ArgumentList "server.py --port $DEV_PORT" `
-        -WorkingDirectory $SERVER_DIR `
-        -RedirectStandardOutput (Join-Path $RUNTIME_DIR "server.log") `
-        -RedirectStandardError (Join-Path $RUNTIME_DIR "server-error.log") `
-        -PassThru `
-        -WindowStyle Hidden
-    Set-Content -Path (Join-Path $RUNTIME_DIR "server.pid") -Value $serverProcess.Id -Encoding ascii
 }
-
-$ready = $false
-for ($attempt = 0; $attempt -lt 20; $attempt++) {
+if ($previous.Count -gt 0) {
+    if (-not $previous.server -or $previous.server.port -ne $PortaApi -or
+        (-not $SemExpo -and (-not $previous.web -or $previous.web.port -ne $PortaWeb -or $previous.web.instance -ne $previous.server.instance))) {
+        throw 'Existe sessao ativa parcial ou com outras portas. Use parar-demo.bat antes de iniciar outra; os processos foram preservados.'
+    }
     try {
-        $health = Invoke-RestMethod -Uri "http://127.0.0.1:$DEV_PORT/health" -TimeoutSec 5
-        if ($health.ok) { $ready = $true; break }
-    } catch {}
-    if (Test-Path $READY_FILE) { $ready = $true; break }
-    Start-Sleep -Milliseconds 250
+        $health = Invoke-RestMethod "http://127.0.0.1:$PortaApi/health" -TimeoutSec 3
+        if (-not $health.ok -or $health.server -ne 'cooperativa-dev-server' -or $health.demo_version -ne 'ride-fare-v6' -or
+            $health.port -ne $PortaApi -or $health.instance_id -ne $previous.server.instance) { throw 'API divergente' }
+        if (-not $SemExpo) {
+            $page = Invoke-WebRequest "http://127.0.0.1:$PortaWeb/" -UseBasicParsing -TimeoutSec 3
+            if ($page.StatusCode -ne 200 -or $page.Headers.Server -notmatch 'CooperativaDemoWeb/' -or $page.Content -notmatch 'expo|root') { throw 'Web divergente' }
+        }
+        foreach ($entry in $previous.GetEnumerator()) {
+            if ((Get-DemoProcessState $entry.Value).state -ne 'Owned') { throw 'Processo mudou' }
+            try { $listeners = @(Get-NetTCPConnection -LocalPort $entry.Value.port -State Listen -ErrorAction Stop) }
+            catch { $listeners = @() }
+            if ($listeners.Count -gt 0 -and $listeners.OwningProcess -notcontains $entry.Value.processId) { throw 'Listener divergente' }
+        }
+    } catch { throw 'A sessao registrada nao confirmou sua saude/identidade. Nenhum processo ou arquivo foi alterado. Confira os logs ou use parar-demo.bat antes de tentar novamente.' }
+    Write-Host "Demo ja esta pronta: http://localhost:$PortaApi/panel" -ForegroundColor Green
+    if (-not $NaoAbrirPainel) { Start-Process "http://localhost:$PortaApi/panel" }
+    return
 }
-if (-not $ready) {
-    throw "O servidor da demo não ficou pronto. Consulte .runtime\server-error.log."
+if ($PortaApi -eq $PortaWeb -and -not $SemExpo) { throw 'API e web precisam de portas diferentes.' }
+# Verificar antes de instalar, exportar ou inicializar dados. Nunca encerrar ocupantes.
+Assert-DemoPortFree $PortaApi
+if (-not $SemExpo) { Assert-DemoPortFree $PortaWeb }
+foreach ($stale in $staleRecords) {
+    if ((Get-FileHash -LiteralPath $stale.path).Hash -ne $stale.hash -or
+        (Get-DemoProcessState $stale.record).state -notin @('Absent','ReusedPid')) { throw 'Registro mudou durante a conferencia; tente novamente.' }
 }
-
-$identityCount = if ($health) { $health.registered_identities } else { 2 }
-Write-Host "✓ [5/5] Servidor validado: $identityCount identidades disponíveis." -ForegroundColor Green
-
-# Abrir o painel web no navegador
-if (-not $NaoAbrirPainel) {
-    Start-Process "http://localhost:$DEV_PORT/panel"
+foreach ($stale in $staleRecords) {
+    $archiveDir = Join-Path $DemoRuntime 'previous-processes'
+    New-Item -ItemType Directory -Force -Path $archiveDir | Out-Null
+    $archivePath = Join-Path $archiveDir ((Split-Path $stale.path -Leaf) + '.' + [guid]::NewGuid().ToString('N') + '.json')
+    if (-not ([IO.Path]::GetFullPath($stale.path).StartsWith($DemoRuntime + '\', [StringComparison]::OrdinalIgnoreCase)) -or
+        -not ([IO.Path]::GetFullPath($archivePath).StartsWith($DemoRuntime + '\', [StringComparison]::OrdinalIgnoreCase))) { throw 'Arquivo fora do runtime reservado.' }
+    Move-Item -LiteralPath $stale.path -Destination $archivePath
+    Write-Host 'Registro de processo encerrado arquivado; nenhum processo foi finalizado.'
 }
-
-Write-Host ""
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
-Write-Host "  🎬 MODO DEMO ATIVO E PRONTO PARA GRAVAÇÃO" -ForegroundColor Cyan
-Write-Host "  🖥️  Mesmo PC:       No painel, clique em 'Iniciar sessão passageiro + motorista'" -ForegroundColor White
-Write-Host "  📱 Celular Físico: Abra o app no celular (conectado ao mesmo Wi-Fi)" -ForegroundColor White
-Write-Host "  🌐 Painel Web:     http://localhost:$DEV_PORT/panel (aberto no navegador)" -ForegroundColor White
-Write-Host "  ⚡ Metro Bundler:   Porta $METRO_PORT (sem conflito com QA)" -ForegroundColor White
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "Pressione Ctrl+C quando desejar encerrar a demo." -ForegroundColor Yellow
-Write-Host ""
-
-# Iniciar o Expo no diretório mobile
-if ($SemExpo) {
-    Write-Host "Modo servidor concluído (-SemExpo)." -ForegroundColor Yellow
-    exit 0
+New-Item -ItemType Directory -Force -Path $DemoRuntime | Out-Null
+$env:TEMP = Join-Path $DemoRuntime 'temp'
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
+$python = Join-Path $DemoRoot '.venv\Scripts\python.exe'
+if (-not (Test-Path -LiteralPath $python)) {
+    & python -m venv (Join-Path $DemoRoot '.venv')
+    if ($LASTEXITCODE -ne 0) { throw 'Falha ao preparar o Python local.' }
 }
-
-if (-not (Test-Path (Join-Path $MOBILE_DIR "node_modules\.bin\expo.cmd"))) {
-    throw "Dependências mobile ausentes. Execute npm ci dentro de ambiente-demo\mobile."
+& $python -c "import flask"
+if ($LASTEXITCODE -ne 0) {
+    & $python -m pip install -r (Join-Path $DemoRoot 'server\requirements.txt')
+    if ($LASTEXITCODE -ne 0) { throw 'Falha ao instalar Flask.' }
 }
-
-Set-Location $MOBILE_DIR
-$env:BROWSER = "none"
-& .\node_modules\.bin\expo.cmd start --web --clear --port $METRO_PORT
+# O launcher de venv no Windows pode criar outro processo Python. Executar o
+# interpretador real com os pacotes desta venv permite registrar o handle exato.
+$runtimePython = (& $python -c "import sys; print(sys._base_executable)").Trim()
+if ($LASTEXITCODE -ne 0 -or -not $runtimePython) { throw 'Interpretador Python nao encontrado.' }
+$env:PYTHONPATH = Join-Path $DemoRoot '.venv\Lib\site-packages'
+$env:PYTHONDONTWRITEBYTECODE = '1'
+$env:DEV_SERVER_PORT = "$PortaApi"
+$env:DEMO_WEB_PORT = "$PortaWeb"
+$env:DEMO_INSTANCE_ID = [guid]::NewGuid().ToString('N')
+$env:EXPO_PUBLIC_DEV_SERVER_URL = "http://localhost:$PortaApi"
+$env:EXPO_NO_TELEMETRY = '1'
+$env:CI = '1'
+$webOutput = Join-Path $DemoRuntime 'web'
+if (-not $SemExpo) {
+    Push-Location (Join-Path $DemoRoot 'mobile')
+    try {
+        if (-not (Test-Path 'node_modules\.bin\expo.cmd')) {
+            & npm.cmd ci --no-audit --no-fund --legacy-peer-deps --cache (Join-Path $DemoRuntime 'npm-cache')
+            if ($LASTEXITCODE -ne 0) { throw 'Falha ao instalar dependencias mobile.' }
+        }
+        # Exporta a versao atual e serve o bundle em background, sem Metro concorrente.
+        & .\node_modules\.bin\expo.cmd export --platform web --clear --output-dir $webOutput
+        if ($LASTEXITCODE -ne 0) { throw 'Falha ao compilar a versao web.' }
+    } finally { Pop-Location }
+}
+$startedHere = @()
+try {
+    $serverPath = Join-Path $DemoRoot 'server\server.py'
+    $api = Start-Process -FilePath $runtimePython -ArgumentList "-S `"$serverPath`" --port $PortaApi" -WorkingDirectory $DemoRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $DemoRuntime 'server.log') -RedirectStandardError (Join-Path $DemoRuntime 'server-error.log')
+    $startedHere += $api
+    Save-DemoProcess $api 'server' $env:DEMO_INSTANCE_ID $PortaApi
+    $ready = $false
+    for ($attempt=0; $attempt -lt 30; $attempt++) {
+        if ($api.HasExited) { throw 'API encerrou; consulte .runtime/server-error.log.' }
+        try {
+            $health = Invoke-RestMethod "http://127.0.0.1:$PortaApi/health" -TimeoutSec 1
+            if ($health.ok -and $health.server -eq 'cooperativa-dev-server' -and $health.demo_version -eq 'ride-fare-v6' -and $health.instance_id -eq $env:DEMO_INSTANCE_ID) { $ready=$true; break }
+        } catch {}
+        Start-Sleep -Milliseconds 200
+    }
+    if (-not $ready) { throw 'API nao confirmou a instancia iniciada.' }
+    if (-not $SemExpo) {
+        $webScript = Join-Path $DemoRoot 'docker\web_server.py'
+        $web = Start-Process -FilePath $runtimePython -ArgumentList "-S `"$webScript`" --port $PortaWeb --root `"$webOutput`"" -WorkingDirectory $DemoRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $DemoRuntime 'web.log') -RedirectStandardError (Join-Path $DemoRuntime 'web-error.log')
+        $startedHere += $web
+        Save-DemoProcess $web 'web' $env:DEMO_INSTANCE_ID $PortaWeb
+        $webReady=$false
+        for ($attempt=0; $attempt -lt 30; $attempt++) {
+            if ($web.HasExited) { throw 'Web encerrou; consulte .runtime/web-error.log.' }
+            try {
+                $page=Invoke-WebRequest "http://127.0.0.1:$PortaWeb/" -UseBasicParsing -TimeoutSec 1
+                if ($page.StatusCode -eq 200 -and $page.Content -match 'expo|root') { $webReady=$true; break }
+            } catch {}
+            Start-Sleep -Milliseconds 200
+        }
+        if (-not $webReady) { throw 'Bundle web nao ficou pronto.' }
+    }
+} catch {
+    # Somente handles criados nesta chamada; nunca procura processos por porta.
+    foreach ($created in $startedHere) { if (-not $created.HasExited) { $created.Kill(); $created.WaitForExit() } }
+    foreach ($serviceName in @('server','web')) {
+        $recordPath = Join-Path $DemoRuntime "$serviceName.process.json"
+        if (Test-Path -LiteralPath $recordPath) {
+            $failedRecord = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+            if ($failedRecord.instance -eq $env:DEMO_INSTANCE_ID) { Remove-Item -LiteralPath $recordPath }
+        }
+    }
+    throw
+}
+Write-Host "Demo atualizada pronta: http://localhost:$PortaApi/panel" -ForegroundColor Green
+Write-Host 'Contas de demonstracao: Demo@123. Para encerrar, use atualizado\parar-demo.bat.'
+if (-not $NaoAbrirPainel) { Start-Process "http://localhost:$PortaApi/panel" }

@@ -21,7 +21,8 @@ export function setDevServerUrl(url: string | null): void {
 export function getDevServerUrl(): string {
   if (runtimeUrl) return runtimeUrl;
   if (Platform.OS === "web" && typeof window !== "undefined" && window.location?.hostname) {
-    return `${window.location.protocol}//${window.location.hostname}:4747`;
+    const apiPort = new URL(configuredUrl).port;
+    return `${window.location.protocol}//${window.location.hostname}${apiPort ? `:${apiPort}` : ""}`;
   }
   return configuredUrl;
 }
